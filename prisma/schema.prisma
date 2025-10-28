@@ -1,0 +1,571 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ============================================
+// USER MANAGEMENT & AUTHENTICATION
+// ============================================
+
+model User {
+  id            String    @id @default(cuid())
+  email         String    @unique
+  name          String?
+  password      String?
+  role          UserRole  @default(EMPLOYEE)
+  avatar        String?
+  phone         String?
+  department    String?
+  jobTitle      String?
+  hourlyRate    Float?
+  startDate     DateTime?
+  active        Boolean   @default(true)
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  // Relations
+  timeEntries        TimeEntry[]
+  timeOffRequests    TimeOffRequest[]
+  assignedTasks      Task[]           @relation("AssignedTasks")
+  createdTasks       Task[]           @relation("CreatedTasks")
+  createdProjects    Project[]        @relation("ProjectCreator")
+  projectMembers     ProjectMember[]
+  chatMessages       ChatMessage[]
+  calendarEvents     CalendarEvent[]
+  createdInvoices    Invoice[]        @relation("InvoiceCreator")
+  createdProposals   Proposal[]       @relation("ProposalCreator")
+  notifications      Notification[]
+  activityLogs       ActivityLog[]
+
+  @@map("users")
+}
+
+enum UserRole {
+  ADMIN
+  MANAGER
+  EMPLOYEE
+  CLIENT
+  CONTRACTOR
+}
+
+// ============================================
+// CRM - COMPANIES & CONTACTS
+// ============================================
+
+model Company {
+  id              String   @id @default(cuid())
+  name            String
+  industry        String?
+  website         String?
+  phone           String?
+  email           String?
+  address         String?
+  city            String?
+  state           String?
+  zip             String?
+  country         String?
+  logo            String?
+  notes           String?
+  status          CompanyStatus @default(ACTIVE)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  // Relations
+  contacts        Contact[]
+  projects        Project[]
+  invoices        Invoice[]
+  proposals       Proposal[]
+
+  @@map("companies")
+}
+
+enum CompanyStatus {
+  ACTIVE
+  INACTIVE
+  PROSPECT
+  ARCHIVED
+}
+
+model Contact {
+  id          String   @id @default(cuid())
+  firstName   String
+  lastName    String
+  email       String?
+  phone       String?
+  jobTitle    String?
+  isPrimary   Boolean  @default(false)
+  notes       String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // Relations
+  companyId   String
+  company     Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  @@map("contacts")
+}
+
+// ============================================
+// PROJECT MANAGEMENT
+// ============================================
+
+model Project {
+  id              String        @id @default(cuid())
+  name            String
+  description     String?
+  status          ProjectStatus @default(PLANNING)
+  priority        Priority      @default(MEDIUM)
+  startDate       DateTime?
+  endDate         DateTime?
+  budget          Float?
+  estimatedHours  Float?
+  color           String?       // For calendar/gantt display
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+
+  // Relations
+  companyId       String
+  company         Company       @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  createdById     String
+  createdBy       User          @relation("ProjectCreator", fields: [createdById], references: [id])
+
+  tasks           Task[]
+  members         ProjectMember[]
+  timeEntries     TimeEntry[]
+  invoices        Invoice[]
+  proposals       Proposal[]
+  calendarEvents  CalendarEvent[]
+
+  @@map("projects")
+}
+
+enum ProjectStatus {
+  PLANNING
+  IN_PROGRESS
+  ON_HOLD
+  COMPLETED
+  CANCELLED
+}
+
+enum Priority {
+  LOW
+  MEDIUM
+  HIGH
+  URGENT
+}
+
+model ProjectMember {
+  id          String   @id @default(cuid())
+  role        String?  // e.g., "Project Manager", "Designer", "Developer"
+  joinedAt    DateTime @default(now())
+
+  // Relations
+  projectId   String
+  project     Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([projectId, userId])
+  @@map("project_members")
+}
+
+// ============================================
+// TASK MANAGEMENT
+// ============================================
+
+model Task {
+  id              String      @id @default(cuid())
+  title           String
+  description     String?
+  status          TaskStatus  @default(TODO)
+  priority        Priority    @default(MEDIUM)
+  startDate       DateTime?
+  dueDate         DateTime?
+  estimatedHours  Float?
+  actualHours     Float?
+  order           Int         @default(0) // For sorting/ordering
+  createdAt       DateTime    @default(now())
+  updatedAt       DateTime    @updatedAt
+
+  // Relations
+  projectId       String
+  project         Project     @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  assignedToId    String?
+  assignedTo      User?       @relation("AssignedTasks", fields: [assignedToId], references: [id])
+
+  createdById     String
+  createdBy       User        @relation("CreatedTasks", fields: [createdById], references: [id])
+
+  subtasks        Subtask[]
+  timeEntries     TimeEntry[]
+  dependencies    TaskDependency[] @relation("DependentTask")
+  blockedBy       TaskDependency[] @relation("BlockingTask")
+
+  @@map("tasks")
+}
+
+enum TaskStatus {
+  TODO
+  IN_PROGRESS
+  IN_REVIEW
+  BLOCKED
+  COMPLETED
+  CANCELLED
+}
+
+model Subtask {
+  id          String   @id @default(cuid())
+  title       String
+  completed   Boolean  @default(false)
+  order       Int      @default(0)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // Relations
+  taskId      String
+  task        Task     @relation(fields: [taskId], references: [id], onDelete: Cascade)
+
+  @@map("subtasks")
+}
+
+model TaskDependency {
+  id              String   @id @default(cuid())
+  dependencyType  String   @default("blocks") // "blocks", "requires"
+  createdAt       DateTime @default(now())
+
+  // The task that depends on another
+  dependentTaskId String
+  dependentTask   Task     @relation("DependentTask", fields: [dependentTaskId], references: [id], onDelete: Cascade)
+
+  // The task that must be completed first
+  blocksTaskId    String
+  blocksTask      Task     @relation("BlockingTask", fields: [blocksTaskId], references: [id], onDelete: Cascade)
+
+  @@unique([dependentTaskId, blocksTaskId])
+  @@map("task_dependencies")
+}
+
+// ============================================
+// TIME TRACKING
+// ============================================
+
+model TimeEntry {
+  id          String    @id @default(cuid())
+  description String?
+  startTime   DateTime
+  endTime     DateTime?
+  duration    Int?      // Duration in minutes
+  billable    Boolean   @default(true)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  // Relations
+  userId      String
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  taskId      String?
+  task        Task?     @relation(fields: [taskId], references: [id], onDelete: SetNull)
+
+  projectId   String
+  project     Project   @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@map("time_entries")
+}
+
+// ============================================
+// TIME OFF MANAGEMENT
+// ============================================
+
+model TimeOffRequest {
+  id          String          @id @default(cuid())
+  type        TimeOffType
+  startDate   DateTime
+  endDate     DateTime
+  reason      String?
+  status      ApprovalStatus  @default(PENDING)
+  reviewedAt  DateTime?
+  reviewNotes String?
+  createdAt   DateTime        @default(now())
+  updatedAt   DateTime        @updatedAt
+
+  // Relations
+  userId      String
+  user        User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("time_off_requests")
+}
+
+enum TimeOffType {
+  VACATION
+  SICK
+  PERSONAL
+  UNPAID
+  OTHER
+}
+
+enum ApprovalStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+// ============================================
+// CALENDAR & EVENTS
+// ============================================
+
+model CalendarEvent {
+  id          String    @id @default(cuid())
+  title       String
+  description String?
+  startTime   DateTime
+  endTime     DateTime
+  allDay      Boolean   @default(false)
+  location    String?
+  color       String?
+  type        EventType @default(MEETING)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  // Relations
+  userId      String?
+  user        User?     @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  projectId   String?
+  project     Project?  @relation(fields: [projectId], references: [id], onDelete: SetNull)
+
+  @@map("calendar_events")
+}
+
+enum EventType {
+  MEETING
+  DEADLINE
+  MILESTONE
+  REMINDER
+  OTHER
+}
+
+// ============================================
+// FINANCIAL - PROPOSALS & INVOICES
+// ============================================
+
+model Proposal {
+  id            String          @id @default(cuid())
+  proposalNumber String         @unique
+  title         String
+  description   String?
+  status        ProposalStatus  @default(DRAFT)
+  validUntil    DateTime?
+  subtotal      Float           @default(0)
+  tax           Float           @default(0)
+  total         Float           @default(0)
+  notes         String?
+  terms         String?
+  sentAt        DateTime?
+  acceptedAt    DateTime?
+  createdAt     DateTime        @default(now())
+  updatedAt     DateTime        @updatedAt
+
+  // Relations
+  companyId     String
+  company       Company         @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  projectId     String?
+  project       Project?        @relation(fields: [projectId], references: [id], onDelete: SetNull)
+
+  createdById   String
+  createdBy     User            @relation("ProposalCreator", fields: [createdById], references: [id])
+
+  items         ProposalItem[]
+
+  @@map("proposals")
+}
+
+enum ProposalStatus {
+  DRAFT
+  SENT
+  ACCEPTED
+  REJECTED
+  EXPIRED
+}
+
+model ProposalItem {
+  id          String   @id @default(cuid())
+  description String
+  quantity    Float    @default(1)
+  unitPrice   Float
+  total       Float
+  order       Int      @default(0)
+  createdAt   DateTime @default(now())
+
+  // Relations
+  proposalId  String
+  proposal    Proposal @relation(fields: [proposalId], references: [id], onDelete: Cascade)
+
+  productId   String?
+  product     Product? @relation(fields: [productId], references: [id], onDelete: SetNull)
+
+  @@map("proposal_items")
+}
+
+model Invoice {
+  id            String        @id @default(cuid())
+  invoiceNumber String        @unique
+  title         String
+  description   String?
+  status        InvoiceStatus @default(DRAFT)
+  issueDate     DateTime      @default(now())
+  dueDate       DateTime
+  paidDate      DateTime?
+  subtotal      Float         @default(0)
+  tax           Float         @default(0)
+  total         Float         @default(0)
+  notes         String?
+  terms         String?
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+
+  // Relations
+  companyId     String
+  company       Company       @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  projectId     String?
+  project       Project?      @relation(fields: [projectId], references: [id], onDelete: SetNull)
+
+  createdById   String
+  createdBy     User          @relation("InvoiceCreator", fields: [createdById], references: [id])
+
+  items         InvoiceItem[]
+
+  @@map("invoices")
+}
+
+enum InvoiceStatus {
+  DRAFT
+  SENT
+  PAID
+  OVERDUE
+  CANCELLED
+}
+
+model InvoiceItem {
+  id          String   @id @default(cuid())
+  description String
+  quantity    Float    @default(1)
+  unitPrice   Float
+  total       Float
+  order       Int      @default(0)
+  createdAt   DateTime @default(now())
+
+  // Relations
+  invoiceId   String
+  invoice     Invoice  @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+
+  productId   String?
+  product     Product? @relation(fields: [productId], references: [id], onDelete: SetNull)
+
+  @@map("invoice_items")
+}
+
+model Product {
+  id          String   @id @default(cuid())
+  name        String
+  description String?
+  sku         String?  @unique
+  unitPrice   Float
+  category    String?
+  active      Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // Relations
+  invoiceItems   InvoiceItem[]
+  proposalItems  ProposalItem[]
+
+  @@map("products")
+}
+
+// ============================================
+// INTERNAL COMMUNICATION
+// ============================================
+
+model ChatChannel {
+  id          String        @id @default(cuid())
+  name        String
+  description String?
+  type        ChannelType   @default(PUBLIC)
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+
+  // Relations
+  messages    ChatMessage[]
+
+  @@map("chat_channels")
+}
+
+enum ChannelType {
+  PUBLIC
+  PRIVATE
+  DIRECT
+}
+
+model ChatMessage {
+  id          String      @id @default(cuid())
+  content     String
+  edited      Boolean     @default(false)
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+
+  // Relations
+  userId      String
+  user        User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  channelId   String
+  channel     ChatChannel @relation(fields: [channelId], references: [id], onDelete: Cascade)
+
+  @@map("chat_messages")
+}
+
+// ============================================
+// NOTIFICATIONS & ACTIVITY
+// ============================================
+
+model Notification {
+  id          String   @id @default(cuid())
+  title       String
+  message     String
+  type        String   // "task_assigned", "project_update", "invoice_paid", etc.
+  read        Boolean  @default(false)
+  link        String?  // URL to navigate to
+  createdAt   DateTime @default(now())
+
+  // Relations
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("notifications")
+}
+
+model ActivityLog {
+  id          String   @id @default(cuid())
+  action      String   // "created", "updated", "deleted", "commented"
+  entityType  String   // "project", "task", "invoice", etc.
+  entityId    String
+  details     String?  // JSON string with additional details
+  createdAt   DateTime @default(now())
+
+  // Relations
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("activity_logs")
+}
