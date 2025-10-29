@@ -2,18 +2,18 @@
 
 import { useEffect, useState } from "react"
 import Link from "next/link"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import {
   FolderKanban,
   Building2,
-  Calendar,
-  DollarSign,
-  Clock,
   Edit,
-  CheckSquare,
 } from "lucide-react"
 import { KanbanBoard } from "@/components/tasks/kanban-board"
+import { ProjectStats } from "@/components/projects/project-stats"
+import { ProjectOverview } from "@/components/projects/project-overview"
+import { TeamMembersCard } from "@/components/projects/team-members-card"
+import { ProjectActivityCard } from "@/components/projects/project-activity-card"
+import { ProjectEditModal } from "@/components/forms/project-edit-modal"
 
 const statusColors = {
   PLANNING: "bg-yellow-100 text-yellow-800",
@@ -42,6 +42,7 @@ interface Project {
   estimatedHours?: number
   companyId: string
   createdAt: number
+  color?: string
 }
 
 interface Company {
@@ -54,39 +55,45 @@ export function ProjectDetailPageClient({ projectId }: { projectId: string }) {
   const [company, setCompany] = useState<Company | null>(null)
   const [tasks, setTasks] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
+  const [showEditModal, setShowEditModal] = useState(false)
+  const [refreshKey, setRefreshKey] = useState(0)
+
+  const fetchData = async () => {
+    try {
+      // Fetch project
+      const projectRes = await fetch(`/api/projects/${projectId}`)
+      if (projectRes.ok) {
+        const projectData = await projectRes.json()
+        setProject(projectData)
+
+        // Fetch company
+        const companyRes = await fetch(`/api/companies/${projectData.companyId}`)
+        if (companyRes.ok) {
+          const companyData = await companyRes.json()
+          setCompany(companyData)
+        }
+      }
+
+      // Fetch tasks
+      const tasksRes = await fetch(`/api/tasks?projectId=${projectId}`)
+      if (tasksRes.ok) {
+        const tasksData = await tasksRes.json()
+        setTasks(tasksData)
+      }
+    } catch (error) {
+      console.error('Failed to fetch project data:', error)
+    } finally {
+      setLoading(false)
+    }
+  }
 
   useEffect(() => {
-    const fetchData = async () => {
-      try {
-        // Fetch project
-        const projectRes = await fetch(`/api/projects/${projectId}`)
-        if (projectRes.ok) {
-          const projectData = await projectRes.json()
-          setProject(projectData)
-
-          // Fetch company
-          const companyRes = await fetch(`/api/companies/${projectData.companyId}`)
-          if (companyRes.ok) {
-            const companyData = await companyRes.json()
-            setCompany(companyData)
-          }
-        }
-
-        // Fetch tasks
-        const tasksRes = await fetch(`/api/tasks?projectId=${projectId}`)
-        if (tasksRes.ok) {
-          const tasksData = await tasksRes.json()
-          setTasks(tasksData)
-        }
-      } catch (error) {
-        console.error('Failed to fetch project data:', error)
-      } finally {
-        setLoading(false)
-      }
-    }
-
     fetchData()
-  }, [projectId])
+  }, [projectId, refreshKey])
+
+  const handleProjectUpdate = () => {
+    setRefreshKey(prev => prev + 1)
+  }
 
   if (loading) {
     return (
@@ -105,6 +112,9 @@ export function ProjectDetailPageClient({ projectId }: { projectId: string }) {
   }
 
   const completedTasks = tasks.filter((t) => t.status === "COMPLETED").length
+  const overdueTasks = tasks.filter((t) =>
+    t.dueDate && t.dueDate < Date.now() && t.status !== "COMPLETED"
+  ).length
   const progress = tasks.length > 0
     ? Math.round((completedTasks / tasks.length) * 100)
     : 0
@@ -114,8 +124,14 @@ export function ProjectDetailPageClient({ projectId }: { projectId: string }) {
       {/* Header */}
       <div className="flex items-start justify-between">
         <div className="flex items-start gap-4">
-          <div className="h-16 w-16 rounded-lg bg-primary/10 flex items-center justify-center">
-            <FolderKanban className="h-8 w-8 text-primary" />
+          <div
+            className="h-16 w-16 rounded-lg flex items-center justify-center"
+            style={{ backgroundColor: project.color ? `${project.color}20` : 'rgb(59 130 246 / 0.1)' }}
+          >
+            <FolderKanban
+              className="h-8 w-8"
+              style={{ color: project.color || 'rgb(59 130 246)' }}
+            />
           </div>
           <div>
             <div className="flex items-center gap-2 mb-1">
@@ -133,13 +149,10 @@ export function ProjectDetailPageClient({ projectId }: { projectId: string }) {
                 {project.priority}
               </span>
             </div>
-            {project.description && (
-              <p className="text-gray-500">{project.description}</p>
-            )}
             {company && (
               <Link
                 href={`/dashboard/companies/${company.id}`}
-                className="text-sm text-primary hover:underline flex items-center gap-1 mt-2"
+                className="text-sm text-primary hover:underline flex items-center gap-1"
               >
                 <Building2 className="h-4 w-4" />
                 {company.name}
@@ -147,105 +160,42 @@ export function ProjectDetailPageClient({ projectId }: { projectId: string }) {
             )}
           </div>
         </div>
+        <Button onClick={() => setShowEditModal(true)}>
+          <Edit className="mr-2 h-4 w-4" />
+          Edit Project
+        </Button>
       </div>
 
       {/* Project Stats */}
-      <div className="grid gap-4 md:grid-cols-4">
-        <Card>
-          <CardContent className="pt-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-gray-500">Progress</p>
-                <p className="text-2xl font-bold">{progress}%</p>
-              </div>
-              <CheckSquare className="h-8 w-8 text-gray-400" />
-            </div>
-            <div className="mt-3 h-2 bg-gray-200 rounded-full">
-              <div
-                className="h-full bg-primary rounded-full"
-                style={{ width: `${progress}%` }}
-              />
-            </div>
-          </CardContent>
-        </Card>
+      <ProjectStats
+        stats={{
+          totalTasks: tasks.length,
+          completedTasks,
+          progress,
+          estimatedHours: project.estimatedHours,
+          hoursTracked: 0, // TODO: Calculate from time entries
+          budget: project.budget,
+          overdueTasks,
+        }}
+      />
 
-        <Card>
-          <CardContent className="pt-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-gray-500">Tasks</p>
-                <p className="text-2xl font-bold">
-                  {completedTasks}/{tasks.length}
-                </p>
-              </div>
-              <CheckSquare className="h-8 w-8 text-gray-400" />
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardContent className="pt-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-gray-500">Estimated Hours</p>
-                <p className="text-2xl font-bold">
-                  {project.estimatedHours || 0}h
-                </p>
-              </div>
-              <Clock className="h-8 w-8 text-gray-400" />
-            </div>
-          </CardContent>
-        </Card>
-
-        {project.budget && (
-          <Card>
-            <CardContent className="pt-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm text-gray-500">Budget</p>
-                  <p className="text-2xl font-bold">
-                    ${project.budget.toLocaleString()}
-                  </p>
-                </div>
-                <DollarSign className="h-8 w-8 text-gray-400" />
-              </div>
-            </CardContent>
-          </Card>
-        )}
-      </div>
-
-      {/* Project Details Sidebar */}
+      {/* Main Content */}
       <div className="grid gap-6 lg:grid-cols-4">
-        <div className="lg:col-span-1">
-          <Card>
-            <CardHeader>
-              <CardTitle>Project Details</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-3 text-sm">
-              {project.startDate && (
-                <div>
-                  <p className="text-gray-500">Start Date</p>
-                  <p className="font-medium">
-                    {new Date(project.startDate).toLocaleDateString()}
-                  </p>
-                </div>
-              )}
-              {project.endDate && (
-                <div>
-                  <p className="text-gray-500">End Date</p>
-                  <p className="font-medium">
-                    {new Date(project.endDate).toLocaleDateString()}
-                  </p>
-                </div>
-              )}
-              <div>
-                <p className="text-gray-500">Created</p>
-                <p className="font-medium">
-                  {new Date(project.createdAt).toLocaleDateString()}
-                </p>
-              </div>
-            </CardContent>
-          </Card>
+        {/* Sidebar */}
+        <div className="space-y-6">
+          <ProjectOverview
+            project={{
+              description: project.description,
+              startDate: project.startDate,
+              endDate: project.endDate,
+              createdAt: project.createdAt,
+              companyName: company?.name,
+            }}
+          />
+
+          <TeamMembersCard projectId={projectId} />
+
+          <ProjectActivityCard projectId={projectId} />
         </div>
 
         {/* Kanban Board */}
@@ -253,6 +203,16 @@ export function ProjectDetailPageClient({ projectId }: { projectId: string }) {
           <KanbanBoard projectId={projectId} />
         </div>
       </div>
+
+      {/* Edit Modal */}
+      {showEditModal && project && (
+        <ProjectEditModal
+          project={project}
+          open={showEditModal}
+          onClose={() => setShowEditModal(false)}
+          onSuccess={handleProjectUpdate}
+        />
+      )}
     </div>
   )
 }
