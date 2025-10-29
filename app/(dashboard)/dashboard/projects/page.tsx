@@ -69,10 +69,12 @@ export default async function ProjectsPage() {
           <h1 className="text-3xl font-bold">Projects</h1>
           <p className="text-gray-500">Manage your agency projects</p>
         </div>
-        <Button>
-          <Plus className="mr-2 h-4 w-4" />
-          New Project
-        </Button>
+        <Link href="/dashboard/projects/new">
+          <Button>
+            <Plus className="mr-2 h-4 w-4" />
+            New Project
+          </Button>
+        </Link>
       </div>
 
       <div className="grid gap-4">
@@ -213,10 +215,12 @@ export default async function ProjectsPage() {
           <CardContent className="flex flex-col items-center justify-center py-12">
             <Building2 className="h-12 w-12 text-gray-400 mb-4" />
             <p className="text-gray-500 mb-4">No projects found</p>
-            <Button>
-              <Plus className="mr-2 h-4 w-4" />
-              Create Your First Project
-            </Button>
+            <Link href="/dashboard/projects/new">
+              <Button>
+                <Plus className="mr-2 h-4 w-4" />
+                Create Your First Project
+              </Button>
+            </Link>
           </CardContent>
         </Card>
       )}

@@ -52,10 +52,12 @@ export default async function CompaniesPage() {
           <h1 className="text-3xl font-bold">Companies</h1>
           <p className="text-gray-500">Manage your client companies</p>
         </div>
-        <Button>
-          <Plus className="mr-2 h-4 w-4" />
-          Add Company
-        </Button>
+        <Link href="/dashboard/companies/new">
+          <Button>
+            <Plus className="mr-2 h-4 w-4" />
+            Add Company
+          </Button>
+        </Link>
       </div>
 
       <div className="grid gap-4">
@@ -158,10 +160,12 @@ export default async function CompaniesPage() {
           <CardContent className="flex flex-col items-center justify-center py-12">
             <Building2 className="h-12 w-12 text-gray-400 mb-4" />
             <p className="text-gray-500 mb-4">No companies found</p>
-            <Button>
-              <Plus className="mr-2 h-4 w-4" />
-              Add Your First Company
-            </Button>
+            <Link href="/dashboard/companies/new">
+              <Button>
+                <Plus className="mr-2 h-4 w-4" />
+                Add Your First Company
+              </Button>
+            </Link>
           </CardContent>
         </Card>
       )}
