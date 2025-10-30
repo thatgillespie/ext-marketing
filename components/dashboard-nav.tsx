@@ -16,6 +16,7 @@ import {
   Settings,
   LogOut,
   UserCircle,
+  BarChart3,
 } from "lucide-react"
 import { signOut } from "next-auth/react"
 
@@ -23,6 +24,7 @@ const navigation = [
   { name: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
   { name: "Projects", href: "/dashboard/projects", icon: FolderKanban },
   { name: "Time Tracking", href: "/dashboard/time-tracking", icon: Clock },
+  { name: "Reports", href: "/dashboard/reports", icon: BarChart3 },
   { name: "Companies", href: "/dashboard/companies", icon: Building2 },
   { name: "Contacts", href: "/dashboard/contacts", icon: UserCircle },
   { name: "Team", href: "/dashboard/team", icon: Users },
