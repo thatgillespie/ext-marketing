@@ -1,19 +1,25 @@
 "use client"
 
 import { useEffect, useState } from "react"
+import dynamic from "next/dynamic"
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import {
   FolderKanban,
   Building2,
   Edit,
+  CheckSquare,
+  Clock,
+  DollarSign,
+  AlertCircle,
 } from "lucide-react"
-import { KanbanBoard } from "@/components/tasks/kanban-board"
-import { ProjectStats } from "@/components/projects/project-stats"
-import { ProjectOverview } from "@/components/projects/project-overview"
-import { TeamMembersCard } from "@/components/projects/team-members-card"
-import { ProjectActivityCard } from "@/components/projects/project-activity-card"
-import { ProjectEditModal } from "@/components/forms/project-edit-modal"
+
+// Dynamic imports to avoid SSR issues
+const KanbanBoard = dynamic(
+  () => import("@/components/tasks/kanban-board").then(mod => ({ default: mod.KanbanBoard })),
+  { ssr: false, loading: () => <div className="text-center py-12 text-gray-500">Loading tasks...</div> }
+)
 
 const statusColors = {
   PLANNING: "bg-yellow-100 text-yellow-800",
@@ -55,8 +61,6 @@ export function ProjectDetailPageClient({ projectId }: { projectId: string }) {
   const [company, setCompany] = useState<Company | null>(null)
   const [tasks, setTasks] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
-  const [showEditModal, setShowEditModal] = useState(false)
-  const [refreshKey, setRefreshKey] = useState(0)
 
   const fetchData = async () => {
     try {
@@ -66,11 +70,13 @@ export function ProjectDetailPageClient({ projectId }: { projectId: string }) {
         const projectData = await projectRes.json()
         setProject(projectData)
 
-        // Fetch company
-        const companyRes = await fetch(`/api/companies/${projectData.companyId}`)
-        if (companyRes.ok) {
-          const companyData = await companyRes.json()
-          setCompany(companyData)
+        // Fetch company if companyId exists
+        if (projectData.companyId) {
+          const companyRes = await fetch(`/api/companies/${projectData.companyId}`)
+          if (companyRes.ok) {
+            const companyData = await companyRes.json()
+            setCompany(companyData)
+          }
         }
       }
 
@@ -78,7 +84,7 @@ export function ProjectDetailPageClient({ projectId }: { projectId: string }) {
       const tasksRes = await fetch(`/api/tasks?projectId=${projectId}`)
       if (tasksRes.ok) {
         const tasksData = await tasksRes.json()
-        setTasks(tasksData)
+        setTasks(Array.isArray(tasksData) ? tasksData : [])
       }
     } catch (error) {
       console.error('Failed to fetch project data:', error)
@@ -89,11 +95,7 @@ export function ProjectDetailPageClient({ projectId }: { projectId: string }) {
 
   useEffect(() => {
     fetchData()
-  }, [projectId, refreshKey])
-
-  const handleProjectUpdate = () => {
-    setRefreshKey(prev => prev + 1)
-  }
+  }, [projectId])
 
   if (loading) {
     return (
@@ -160,59 +162,136 @@ export function ProjectDetailPageClient({ projectId }: { projectId: string }) {
             )}
           </div>
         </div>
-        <Button onClick={() => setShowEditModal(true)}>
-          <Edit className="mr-2 h-4 w-4" />
-          Edit Project
-        </Button>
+        <Link href={`/dashboard/projects/${project.id}/edit`}>
+          <Button>
+            <Edit className="mr-2 h-4 w-4" />
+            Edit Project
+          </Button>
+        </Link>
       </div>
 
       {/* Project Stats */}
-      <ProjectStats
-        stats={{
-          totalTasks: tasks.length,
-          completedTasks,
-          progress,
-          estimatedHours: project.estimatedHours,
-          hoursTracked: 0, // TODO: Calculate from time entries
-          budget: project.budget,
-          overdueTasks,
-        }}
-      />
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between pb-2">
+            <CardTitle className="text-sm font-medium text-gray-600">
+              Total Tasks
+            </CardTitle>
+            <CheckSquare className="h-4 w-4 text-gray-500" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{tasks.length}</div>
+            <p className="text-xs text-gray-500">{completedTasks} completed</p>
+          </CardContent>
+        </Card>
 
-      {/* Main Content */}
-      <div className="grid gap-6 lg:grid-cols-4">
-        {/* Sidebar */}
-        <div className="space-y-6">
-          <ProjectOverview
-            project={{
-              description: project.description,
-              startDate: project.startDate,
-              endDate: project.endDate,
-              createdAt: project.createdAt,
-              companyName: company?.name,
-            }}
-          />
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between pb-2">
+            <CardTitle className="text-sm font-medium text-gray-600">
+              Progress
+            </CardTitle>
+            <CheckSquare className="h-4 w-4 text-gray-500" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{progress}%</div>
+            <div className="mt-2 h-2 bg-gray-200 rounded-full overflow-hidden">
+              <div
+                className="h-full bg-primary rounded-full transition-all"
+                style={{ width: `${progress}%` }}
+              />
+            </div>
+          </CardContent>
+        </Card>
 
-          <TeamMembersCard projectId={projectId} />
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between pb-2">
+            <CardTitle className="text-sm font-medium text-gray-600">
+              Estimated Hours
+            </CardTitle>
+            <Clock className="h-4 w-4 text-gray-500" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{project.estimatedHours || 0}h</div>
+            <p className="text-xs text-gray-500">Total estimate</p>
+          </CardContent>
+        </Card>
 
-          <ProjectActivityCard projectId={projectId} />
-        </div>
+        {project.budget && (
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between pb-2">
+              <CardTitle className="text-sm font-medium text-gray-600">
+                Budget
+              </CardTitle>
+              <DollarSign className="h-4 w-4 text-gray-500" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">${project.budget.toLocaleString()}</div>
+              <p className="text-xs text-gray-500">Project budget</p>
+            </CardContent>
+          </Card>
+        )}
 
-        {/* Kanban Board */}
-        <div className="lg:col-span-3">
-          <KanbanBoard projectId={projectId} />
-        </div>
+        {overdueTasks > 0 && (
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between pb-2">
+              <CardTitle className="text-sm font-medium text-gray-600">
+                Overdue Tasks
+              </CardTitle>
+              <AlertCircle className="h-4 w-4 text-red-500" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold text-red-600">{overdueTasks}</div>
+              <p className="text-xs text-gray-500">Need attention</p>
+            </CardContent>
+          </Card>
+        )}
       </div>
 
-      {/* Edit Modal */}
-      {showEditModal && project && (
-        <ProjectEditModal
-          project={project}
-          open={showEditModal}
-          onClose={() => setShowEditModal(false)}
-          onSuccess={handleProjectUpdate}
-        />
+      {/* Project Description */}
+      {project.description && (
+        <Card>
+          <CardHeader>
+            <CardTitle>Description</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p className="text-sm text-gray-600 whitespace-pre-wrap">{project.description}</p>
+          </CardContent>
+        </Card>
       )}
+
+      {/* Dates */}
+      {(project.startDate || project.endDate) && (
+        <Card>
+          <CardHeader>
+            <CardTitle>Timeline</CardTitle>
+          </CardHeader>
+          <CardContent className="grid gap-4 sm:grid-cols-2">
+            {project.startDate && (
+              <div>
+                <p className="text-sm text-gray-500 mb-1">Start Date</p>
+                <p className="text-sm font-medium">
+                  {new Date(project.startDate).toLocaleDateString()}
+                </p>
+              </div>
+            )}
+            {project.endDate && (
+              <div>
+                <p className="text-sm text-gray-500 mb-1">End Date</p>
+                <p className="text-sm font-medium">
+                  {new Date(project.endDate).toLocaleDateString()}
+                </p>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Kanban Board */}
+      <Card>
+        <CardContent className="pt-6">
+          <KanbanBoard projectId={projectId} />
+        </CardContent>
+      </Card>
     </div>
   )
 }
