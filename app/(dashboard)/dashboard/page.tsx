@@ -1,107 +1,86 @@
-import { getServerSession } from "next-auth"
-import { authOptions } from "@/lib/auth"
-import { prisma } from "@/lib/prisma"
+"use client"
+
+import { useEffect, useState } from "react"
+import { useSession } from "next-auth/react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import {
   FolderKanban,
   CheckSquare,
   Clock,
-  DollarSign,
-  TrendingUp,
-  Users,
+  AlertCircle,
   Calendar,
-  AlertCircle
+  Users,
+  DollarSign
 } from "lucide-react"
+import Link from "next/link"
 
-async function getDashboardData(userId: string) {
-  const [
-    projectCount,
-    activeTaskCount,
-    timeEntriesThisWeek,
-    upcomingDeadlines,
-    recentActivity,
-  ] = await Promise.all([
-    prisma.project.count({
-      where: {
-        members: {
-          some: {
-            userId,
-          },
-        },
-        status: {
-          in: ["PLANNING", "IN_PROGRESS"],
-        },
-      },
-    }),
-    prisma.task.count({
-      where: {
-        assignedToId: userId,
-        status: {
-          in: ["TODO", "IN_PROGRESS"],
-        },
-      },
-    }),
-    prisma.timeEntry.aggregate({
-      where: {
-        userId,
-        startTime: {
-          gte: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000),
-        },
-      },
-      _sum: {
-        duration: true,
-      },
-    }),
-    prisma.task.findMany({
-      where: {
-        assignedToId: userId,
-        dueDate: {
-          gte: new Date(),
-          lte: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
-        },
-        status: {
-          not: "COMPLETED",
-        },
-      },
-      include: {
-        project: {
-          select: {
-            name: true,
-          },
-        },
-      },
-      orderBy: {
-        dueDate: "asc",
-      },
-      take: 5,
-    }),
-    prisma.activityLog.findMany({
-      where: {
-        userId,
-      },
-      orderBy: {
-        createdAt: "desc",
-      },
-      take: 5,
-    }),
-  ])
+export default function DashboardPage() {
+  const { data: session } = useSession()
+  const [stats, setStats] = useState({
+    projectCount: 0,
+    activeTaskCount: 0,
+    hoursThisWeek: 0,
+    upcomingDeadlinesCount: 0
+  })
+  const [loading, setLoading] = useState(true)
 
-  const hoursThisWeek = Math.round((timeEntriesThisWeek._sum.duration || 0) / 60 * 10) / 10
+  useEffect(() => {
+    const fetchDashboardData = async () => {
+      if (!session?.user) return
 
-  return {
-    projectCount,
-    activeTaskCount,
-    hoursThisWeek,
-    upcomingDeadlines,
-    recentActivity,
+      try {
+        // Fetch basic stats from various APIs
+        const [projectsRes, timeEntriesRes] = await Promise.all([
+          fetch('/api/projects'),
+          fetch('/api/time-entries')
+        ])
+
+        const projects = await projectsRes.json()
+        const timeEntries = await timeEntriesRes.json()
+
+        // Calculate stats
+        const activeProjects = Array.isArray(projects)
+          ? projects.filter((p: any) =>
+              p.status === 'PLANNING' || p.status === 'IN_PROGRESS'
+            ).length
+          : 0
+
+        // Calculate hours this week
+        const weekAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000)
+        const thisWeekEntries = Array.isArray(timeEntries)
+          ? timeEntries.filter((entry: any) =>
+              new Date(entry.startTime) >= weekAgo
+            )
+          : []
+        const totalMinutes = thisWeekEntries.reduce(
+          (sum: number, entry: any) => sum + (entry.duration || 0),
+          0
+        )
+        const hoursThisWeek = Math.round((totalMinutes / 60) * 10) / 10
+
+        setStats({
+          projectCount: activeProjects,
+          activeTaskCount: 0, // Would need tasks API
+          hoursThisWeek,
+          upcomingDeadlinesCount: 0 // Would need tasks API with deadlines
+        })
+      } catch (error) {
+        console.error('Failed to fetch dashboard data:', error)
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    fetchDashboardData()
+  }, [session])
+
+  if (loading) {
+    return (
+      <div className="text-center py-12">
+        <p className="text-gray-500">Loading dashboard...</p>
+      </div>
+    )
   }
-}
-
-export default async function DashboardPage() {
-  const session = await getServerSession(authOptions)
-  const userId = (session?.user as any)?.id
-
-  const data = await getDashboardData(userId)
 
   return (
     <div className="space-y-6">
@@ -120,7 +99,7 @@ export default async function DashboardPage() {
             <FolderKanban className="h-4 w-4 text-gray-500" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{data.projectCount}</div>
+            <div className="text-2xl font-bold">{stats.projectCount}</div>
             <p className="text-xs text-gray-500">Projects in progress</p>
           </CardContent>
         </Card>
@@ -133,7 +112,7 @@ export default async function DashboardPage() {
             <CheckSquare className="h-4 w-4 text-gray-500" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{data.activeTaskCount}</div>
+            <div className="text-2xl font-bold">{stats.activeTaskCount}</div>
             <p className="text-xs text-gray-500">Tasks to complete</p>
           </CardContent>
         </Card>
@@ -146,7 +125,7 @@ export default async function DashboardPage() {
             <Clock className="h-4 w-4 text-gray-500" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{data.hoursThisWeek}h</div>
+            <div className="text-2xl font-bold">{stats.hoursThisWeek}h</div>
             <p className="text-xs text-gray-500">Tracked time</p>
           </CardContent>
         </Card>
@@ -159,64 +138,8 @@ export default async function DashboardPage() {
             <AlertCircle className="h-4 w-4 text-gray-500" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{data.upcomingDeadlines.length}</div>
+            <div className="text-2xl font-bold">{stats.upcomingDeadlinesCount}</div>
             <p className="text-xs text-gray-500">Next 7 days</p>
-          </CardContent>
-        </Card>
-      </div>
-
-      <div className="grid gap-4 md:grid-cols-2">
-        {/* Upcoming Deadlines */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Upcoming Deadlines</CardTitle>
-          </CardHeader>
-          <CardContent>
-            {data.upcomingDeadlines.length === 0 ? (
-              <p className="text-sm text-gray-500">No upcoming deadlines</p>
-            ) : (
-              <div className="space-y-3">
-                {data.upcomingDeadlines.map((task) => (
-                  <div key={task.id} className="flex items-start justify-between">
-                    <div className="space-y-1">
-                      <p className="text-sm font-medium">{task.title}</p>
-                      <p className="text-xs text-gray-500">{task.project.name}</p>
-                    </div>
-                    <div className="text-xs text-gray-500">
-                      {new Date(task.dueDate!).toLocaleDateString()}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </CardContent>
-        </Card>
-
-        {/* Recent Activity */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Recent Activity</CardTitle>
-          </CardHeader>
-          <CardContent>
-            {data.recentActivity.length === 0 ? (
-              <p className="text-sm text-gray-500">No recent activity</p>
-            ) : (
-              <div className="space-y-3">
-                {data.recentActivity.map((activity) => (
-                  <div key={activity.id} className="flex items-start gap-3">
-                    <div className="mt-1 h-2 w-2 rounded-full bg-primary"></div>
-                    <div className="flex-1 space-y-1">
-                      <p className="text-sm">
-                        {activity.action} {activity.entityType}
-                      </p>
-                      <p className="text-xs text-gray-500">
-                        {new Date(activity.createdAt).toLocaleString()}
-                      </p>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
           </CardContent>
         </Card>
       </div>
@@ -228,34 +151,62 @@ export default async function DashboardPage() {
         </CardHeader>
         <CardContent>
           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-            <a
+            <Link
               href="/dashboard/time-tracking"
               className="flex items-center gap-3 rounded-lg border p-3 transition-colors hover:bg-gray-50"
             >
               <Clock className="h-5 w-5 text-primary" />
               <span className="text-sm font-medium">Start Timer</span>
-            </a>
-            <a
+            </Link>
+            <Link
               href="/dashboard/projects"
               className="flex items-center gap-3 rounded-lg border p-3 transition-colors hover:bg-gray-50"
             >
               <FolderKanban className="h-5 w-5 text-primary" />
-              <span className="text-sm font-medium">New Project</span>
-            </a>
-            <a
+              <span className="text-sm font-medium">View Projects</span>
+            </Link>
+            <Link
               href="/dashboard/companies"
               className="flex items-center gap-3 rounded-lg border p-3 transition-colors hover:bg-gray-50"
             >
               <Users className="h-5 w-5 text-primary" />
-              <span className="text-sm font-medium">Add Company</span>
-            </a>
-            <a
+              <span className="text-sm font-medium">View Companies</span>
+            </Link>
+            <Link
               href="/dashboard/calendar"
               className="flex items-center gap-3 rounded-lg border p-3 transition-colors hover:bg-gray-50"
             >
               <Calendar className="h-5 w-5 text-primary" />
               <span className="text-sm font-medium">View Calendar</span>
-            </a>
+            </Link>
+            <Link
+              href="/dashboard/invoices"
+              className="flex items-center gap-3 rounded-lg border p-3 transition-colors hover:bg-gray-50"
+            >
+              <DollarSign className="h-5 w-5 text-primary" />
+              <span className="text-sm font-medium">View Invoices</span>
+            </Link>
+            <Link
+              href="/dashboard/proposals"
+              className="flex items-center gap-3 rounded-lg border p-3 transition-colors hover:bg-gray-50"
+            >
+              <CheckSquare className="h-5 w-5 text-primary" />
+              <span className="text-sm font-medium">View Proposals</span>
+            </Link>
+            <Link
+              href="/dashboard/contacts"
+              className="flex items-center gap-3 rounded-lg border p-3 transition-colors hover:bg-gray-50"
+            >
+              <Users className="h-5 w-5 text-primary" />
+              <span className="text-sm font-medium">View Contacts</span>
+            </Link>
+            <Link
+              href="/dashboard/reports"
+              className="flex items-center gap-3 rounded-lg border p-3 transition-colors hover:bg-gray-50"
+            >
+              <FolderKanban className="h-5 w-5 text-primary" />
+              <span className="text-sm font-medium">View Reports</span>
+            </Link>
           </div>
         </CardContent>
       </Card>

@@ -1,39 +1,10 @@
+"use client"
+
+import { useEffect, useState } from "react"
 import Link from "next/link"
-import { prisma } from "@/lib/prisma"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Plus, Building2, Globe, Mail, Phone, MapPin } from "lucide-react"
-
-async function getCompanies() {
-  const companies = await prisma.company.findMany({
-    orderBy: {
-      name: "asc",
-    },
-    include: {
-      contacts: {
-        take: 1,
-        where: {
-          isPrimary: true,
-        },
-      },
-      projects: {
-        where: {
-          status: {
-            in: ["PLANNING", "IN_PROGRESS"],
-          },
-        },
-      },
-      _count: {
-        select: {
-          contacts: true,
-          projects: true,
-        },
-      },
-    },
-  })
-
-  return companies
-}
 
 const statusColors = {
   ACTIVE: "bg-green-100 text-green-800",
@@ -42,8 +13,35 @@ const statusColors = {
   ARCHIVED: "bg-red-100 text-red-800",
 }
 
-export default async function CompaniesPage() {
-  const companies = await getCompanies()
+export default function CompaniesPage() {
+  const [companies, setCompanies] = useState<any[]>([])
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    const fetchCompanies = async () => {
+      try {
+        const response = await fetch('/api/companies')
+        if (response.ok) {
+          const data = await response.json()
+          setCompanies(Array.isArray(data) ? data : [])
+        }
+      } catch (error) {
+        console.error('Failed to fetch companies:', error)
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    fetchCompanies()
+  }, [])
+
+  if (loading) {
+    return (
+      <div className="text-center py-12">
+        <p className="text-gray-500">Loading companies...</p>
+      </div>
+    )
+  }
 
   return (
     <div className="space-y-6">
@@ -62,8 +60,8 @@ export default async function CompaniesPage() {
 
       <div className="grid gap-4">
         {companies.map((company) => {
-          const primaryContact = company.contacts[0]
-          const activeProjects = company.projects.length
+          const activeProjects = company.activeProjectCount || 0
+          const contactCount = company.contactCount || 0
 
           return (
             <Link key={company.id} href={`/dashboard/companies/${company.id}`}>
@@ -81,7 +79,7 @@ export default async function CompaniesPage() {
                             <h3 className="font-semibold text-lg">{company.name}</h3>
                             <span
                               className={`px-2 py-0.5 rounded-full text-xs font-medium ${
-                                statusColors[company.status]
+                                statusColors[company.status as keyof typeof statusColors] || statusColors.ACTIVE
                               }`}
                             >
                               {company.status}
@@ -122,14 +120,12 @@ export default async function CompaniesPage() {
                           )}
                         </div>
 
-                        {primaryContact && (
+                        {company.primaryContactName && (
                           <div className="text-sm">
                             <span className="text-gray-500">Primary Contact: </span>
-                            <span className="font-medium">
-                              {primaryContact.firstName} {primaryContact.lastName}
-                            </span>
-                            {primaryContact.email && (
-                              <span className="text-gray-500"> • {primaryContact.email}</span>
+                            <span className="font-medium">{company.primaryContactName}</span>
+                            {company.primaryContactEmail && (
+                              <span className="text-gray-500"> • {company.primaryContactEmail}</span>
                             )}
                           </div>
                         )}
@@ -143,7 +139,7 @@ export default async function CompaniesPage() {
                           <span className="text-gray-500"> active projects</span>
                         </div>
                         <div className="text-sm text-gray-500">
-                          {company._count.contacts} contacts
+                          {contactCount} contacts
                         </div>
                       </div>
                     </div>

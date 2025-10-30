@@ -1,48 +1,10 @@
+"use client"
+
+import { useEffect, useState } from "react"
 import Link from "next/link"
-import { prisma } from "@/lib/prisma"
 import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Plus, Building2, Users, CheckSquare, DollarSign, Calendar } from "lucide-react"
-
-async function getProjects() {
-  const projects = await prisma.project.findMany({
-    orderBy: {
-      createdAt: "desc",
-    },
-    include: {
-      company: {
-        select: {
-          name: true,
-        },
-      },
-      members: {
-        include: {
-          user: {
-            select: {
-              name: true,
-              avatar: true,
-            },
-          },
-        },
-        take: 5,
-      },
-      tasks: {
-        where: {
-          status: {
-            not: "COMPLETED",
-          },
-        },
-      },
-      _count: {
-        select: {
-          tasks: true,
-        },
-      },
-    },
-  })
-
-  return projects
-}
 
 const statusColors = {
   PLANNING: "bg-yellow-100 text-yellow-800",
@@ -59,8 +21,35 @@ const priorityColors = {
   URGENT: "text-red-600",
 }
 
-export default async function ProjectsPage() {
-  const projects = await getProjects()
+export default function ProjectsPage() {
+  const [projects, setProjects] = useState<any[]>([])
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    const fetchProjects = async () => {
+      try {
+        const response = await fetch('/api/projects')
+        if (response.ok) {
+          const data = await response.json()
+          setProjects(Array.isArray(data) ? data : [])
+        }
+      } catch (error) {
+        console.error('Failed to fetch projects:', error)
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    fetchProjects()
+  }, [])
+
+  if (loading) {
+    return (
+      <div className="text-center py-12">
+        <p className="text-gray-500">Loading projects...</p>
+      </div>
+    )
+  }
 
   return (
     <div className="space-y-6">
@@ -79,9 +68,10 @@ export default async function ProjectsPage() {
 
       <div className="grid gap-4">
         {projects.map((project) => {
-          const completedTasks = project._count.tasks - project.tasks.length
-          const progress = project._count.tasks > 0
-            ? Math.round((completedTasks / project._count.tasks) * 100)
+          const totalTasks = project.taskCount || 0
+          const completedTasks = project.completedTaskCount || 0
+          const progress = totalTasks > 0
+            ? Math.round((completedTasks / totalTasks) * 100)
             : 0
 
           return (
@@ -96,14 +86,14 @@ export default async function ProjectsPage() {
                           <h3 className="font-semibold text-lg">{project.name}</h3>
                           <span
                             className={`px-2 py-0.5 rounded-full text-xs font-medium ${
-                              statusColors[project.status]
+                              statusColors[project.status as keyof typeof statusColors] || statusColors.PLANNING
                             }`}
                           >
                             {project.status.replace("_", " ")}
                           </span>
                           <span
                             className={`text-xs font-medium ${
-                              priorityColors[project.priority]
+                              priorityColors[project.priority as keyof typeof priorityColors] || priorityColors.MEDIUM
                             }`}
                           >
                             {project.priority}
@@ -121,14 +111,14 @@ export default async function ProjectsPage() {
                     <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
                       <div className="flex items-center gap-2 text-sm">
                         <Building2 className="h-4 w-4 text-gray-500" />
-                        <span className="text-gray-600">{project.company.name}</span>
+                        <span className="text-gray-600">{project.companyName || 'No company'}</span>
                       </div>
 
-                      {project.members.length > 0 && (
+                      {project.memberCount > 0 && (
                         <div className="flex items-center gap-2 text-sm">
                           <Users className="h-4 w-4 text-gray-500" />
                           <span className="text-gray-600">
-                            {project.members.length} members
+                            {project.memberCount} members
                           </span>
                         </div>
                       )}
@@ -136,7 +126,7 @@ export default async function ProjectsPage() {
                       <div className="flex items-center gap-2 text-sm">
                         <CheckSquare className="h-4 w-4 text-gray-500" />
                         <span className="text-gray-600">
-                          {completedTasks}/{project._count.tasks} tasks
+                          {completedTasks}/{totalTasks} tasks
                         </span>
                       </div>
 
@@ -163,7 +153,7 @@ export default async function ProjectsPage() {
                     </div>
 
                     {/* Progress Bar */}
-                    {project._count.tasks > 0 && (
+                    {totalTasks > 0 && (
                       <div>
                         <div className="flex items-center justify-between mb-1">
                           <span className="text-xs text-gray-500">Progress</span>
@@ -176,29 +166,6 @@ export default async function ProjectsPage() {
                             className="h-full bg-primary rounded-full transition-all"
                             style={{ width: `${progress}%` }}
                           />
-                        </div>
-                      </div>
-                    )}
-
-                    {/* Team Members */}
-                    {project.members.length > 0 && (
-                      <div className="flex items-center gap-2">
-                        <span className="text-xs text-gray-500">Team:</span>
-                        <div className="flex -space-x-2">
-                          {project.members.slice(0, 5).map((member) => (
-                            <div
-                              key={member.id}
-                              className="h-8 w-8 rounded-full bg-primary text-primary-foreground flex items-center justify-center text-xs font-medium border-2 border-white"
-                              title={member.user.name || undefined}
-                            >
-                              {member.user.name?.charAt(0) || "?"}
-                            </div>
-                          ))}
-                          {project.members.length > 5 && (
-                            <div className="h-8 w-8 rounded-full bg-gray-200 flex items-center justify-center text-xs font-medium border-2 border-white">
-                              +{project.members.length - 5}
-                            </div>
-                          )}
                         </div>
                       </div>
                     )}

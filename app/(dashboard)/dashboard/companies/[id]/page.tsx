@@ -1,6 +1,8 @@
+"use client"
+
+import { useEffect, useState } from "react"
+import { useRouter } from "next/navigation"
 import Link from "next/link"
-import { notFound } from "next/navigation"
-import { prisma } from "@/lib/prisma"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import {
@@ -17,39 +19,6 @@ import {
   Plus,
 } from "lucide-react"
 
-async function getCompany(id: string) {
-  const company = await prisma.company.findUnique({
-    where: { id },
-    include: {
-      contacts: {
-        orderBy: {
-          isPrimary: "desc",
-        },
-      },
-      projects: {
-        orderBy: {
-          createdAt: "desc",
-        },
-        take: 5,
-      },
-      proposals: {
-        orderBy: {
-          createdAt: "desc",
-        },
-        take: 5,
-      },
-      invoices: {
-        orderBy: {
-          createdAt: "desc",
-        },
-        take: 5,
-      },
-    },
-  })
-
-  return company
-}
-
 const statusColors = {
   ACTIVE: "bg-green-100 text-green-800",
   INACTIVE: "bg-gray-100 text-gray-800",
@@ -65,15 +34,49 @@ const projectStatusColors = {
   CANCELLED: "bg-red-100 text-red-800",
 }
 
-export default async function CompanyDetailPage({
+export default function CompanyDetailPage({
   params,
 }: {
   params: { id: string }
 }) {
-  const company = await getCompany(params.id)
+  const router = useRouter()
+  const [company, setCompany] = useState<any>(null)
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    const fetchCompany = async () => {
+      try {
+        const response = await fetch(`/api/companies/${params.id}`)
+        if (response.ok) {
+          const data = await response.json()
+          setCompany(data)
+        } else if (response.status === 404) {
+          router.push('/dashboard/companies')
+        }
+      } catch (error) {
+        console.error('Failed to fetch company:', error)
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    fetchCompany()
+  }, [params.id, router])
+
+  if (loading) {
+    return (
+      <div className="text-center py-12">
+        <p className="text-gray-500">Loading company...</p>
+      </div>
+    )
+  }
 
   if (!company) {
-    notFound()
+    return (
+      <div className="text-center py-12">
+        <p className="text-gray-500">Company not found</p>
+      </div>
+    )
   }
 
   return (
@@ -89,7 +92,7 @@ export default async function CompanyDetailPage({
               <h1 className="text-3xl font-bold">{company.name}</h1>
               <span
                 className={`px-2 py-1 rounded-full text-xs font-medium ${
-                  statusColors[company.status]
+                  statusColors[company.status as keyof typeof statusColors] || statusColors.ACTIVE
                 }`}
               >
                 {company.status}
@@ -196,28 +199,28 @@ export default async function CompanyDetailPage({
                 <User className="h-4 w-4 text-gray-500" />
                 <span className="text-sm text-gray-600">Contacts</span>
               </div>
-              <span className="font-semibold">{company.contacts.length}</span>
+              <span className="font-semibold">{company.contacts?.length || 0}</span>
             </div>
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <FolderKanban className="h-4 w-4 text-gray-500" />
                 <span className="text-sm text-gray-600">Projects</span>
               </div>
-              <span className="font-semibold">{company.projects.length}</span>
+              <span className="font-semibold">{company.projects?.length || 0}</span>
             </div>
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <FileText className="h-4 w-4 text-gray-500" />
                 <span className="text-sm text-gray-600">Proposals</span>
               </div>
-              <span className="font-semibold">{company.proposals.length}</span>
+              <span className="font-semibold">{company.proposals?.length || 0}</span>
             </div>
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <Receipt className="h-4 w-4 text-gray-500" />
                 <span className="text-sm text-gray-600">Invoices</span>
               </div>
-              <span className="font-semibold">{company.invoices.length}</span>
+              <span className="font-semibold">{company.invoices?.length || 0}</span>
             </div>
           </CardContent>
         </Card>
@@ -233,11 +236,11 @@ export default async function CompanyDetailPage({
           </Button>
         </CardHeader>
         <CardContent>
-          {company.contacts.length === 0 ? (
+          {!company.contacts || company.contacts.length === 0 ? (
             <p className="text-sm text-gray-500">No contacts added</p>
           ) : (
             <div className="space-y-3">
-              {company.contacts.map((contact) => (
+              {company.contacts.map((contact: any) => (
                 <div
                   key={contact.id}
                   className="flex items-center justify-between p-3 rounded-lg border"
@@ -297,11 +300,11 @@ export default async function CompanyDetailPage({
           </Button>
         </CardHeader>
         <CardContent>
-          {company.projects.length === 0 ? (
+          {!company.projects || company.projects.length === 0 ? (
             <p className="text-sm text-gray-500">No projects</p>
           ) : (
             <div className="space-y-2">
-              {company.projects.map((project) => (
+              {company.projects.map((project: any) => (
                 <Link
                   key={project.id}
                   href={`/dashboard/projects/${project.id}`}
@@ -317,7 +320,7 @@ export default async function CompanyDetailPage({
                   </div>
                   <span
                     className={`px-2 py-1 rounded-full text-xs font-medium ${
-                      projectStatusColors[project.status]
+                      projectStatusColors[project.status as keyof typeof projectStatusColors] || projectStatusColors.PLANNING
                     }`}
                   >
                     {project.status.replace("_", " ")}
