@@ -15,6 +15,7 @@ import {
   MessageSquare,
   Settings,
   LogOut,
+  UserCircle,
 } from "lucide-react"
 import { signOut } from "next-auth/react"
 
@@ -23,6 +24,7 @@ const navigation = [
   { name: "Projects", href: "/dashboard/projects", icon: FolderKanban },
   { name: "Time Tracking", href: "/dashboard/time-tracking", icon: Clock },
   { name: "Companies", href: "/dashboard/companies", icon: Building2 },
+  { name: "Contacts", href: "/dashboard/contacts", icon: UserCircle },
   { name: "Team", href: "/dashboard/team", icon: Users },
   { name: "Calendar", href: "/dashboard/calendar", icon: Calendar },
   { name: "Proposals", href: "/dashboard/proposals", icon: FileText },
