@@ -47,7 +47,7 @@ export async function GET(request: NextRequest) {
 
     // Convert SQLite boolean to actual boolean
     const formattedUsers = users.map((user: any) => ({
-      ...user,
+      ...(user as any),
       active: Boolean(user.active)
     }))
 
@@ -150,7 +150,7 @@ export async function POST(request: NextRequest) {
     `).get(id)
 
     return NextResponse.json({
-      ...user,
+      ...(user as any),
       active: Boolean((user as any).active)
     }, { status: 201 })
   } catch (error) {

@@ -46,7 +46,7 @@ export async function GET(
       // Get subtasks
       const subtasks = db.prepare('SELECT * FROM subtasks WHERE taskId = ? ORDER BY "order" ASC').all(params.id)
 
-      return NextResponse.json({ ...task, subtasks })
+      return NextResponse.json({ ...(task as any), subtasks })
     } finally {
       db.close()
     }

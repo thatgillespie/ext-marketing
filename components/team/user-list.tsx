@@ -8,20 +8,8 @@ import { User, Edit, Trash2, Eye, Search, Mail, Phone } from "lucide-react"
 import { getUserDisplayName, getUserInitials, ROLE_COLORS, ROLE_LABELS, formatHourlyRate, UserRole } from "@/lib/types/user"
 import Link from "next/link"
 
-interface UserType {
-  id: string
-  name?: string | null
-  email: string
-  role: UserRole
-  phone?: string | null
-  department?: string | null
-  jobTitle?: string | null
-  hourlyRate?: number | null
-  active: boolean
-}
-
 interface UserListProps {
-  users: UserType[]
+  users: any[]
   onUpdate: () => void
 }
 
@@ -69,9 +57,9 @@ export function UserList({ users, onUpdate }: UserListProps) {
   })
 
   // Group by role
-  const groupedUsers: Record<string, UserType[]> = {}
+  const groupedUsers: Record<string, any[]> = {}
   filteredUsers.forEach(user => {
-    const roleLabel = ROLE_LABELS[user.role]
+    const roleLabel = ROLE_LABELS[user.role as UserRole]
     if (!groupedUsers[roleLabel]) {
       groupedUsers[roleLabel] = []
     }
@@ -222,8 +210,8 @@ export function UserList({ users, onUpdate }: UserListProps) {
                               </span>
                             )}
                           </div>
-                          <span className={`inline-block text-xs px-2 py-0.5 rounded-full ${ROLE_COLORS[user.role]}`}>
-                            {ROLE_LABELS[user.role]}
+                          <span className={`inline-block text-xs px-2 py-0.5 rounded-full ${ROLE_COLORS[user.role as UserRole]}`}>
+                            {ROLE_LABELS[user.role as UserRole]}
                           </span>
                           {user.jobTitle && (
                             <p className="text-xs text-gray-600 mt-1">{user.jobTitle}</p>

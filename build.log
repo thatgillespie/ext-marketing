@@ -1,0 +1,23 @@
+
+> ext-marketing@0.1.0 build
+> next build
+
+  ▲ Next.js 14.2.5
+  - Environments: .env
+
+   Creating an optimized production build ...
+ ✓ Compiled successfully
+   Linting and checking validity of types ...
+Failed to compile.
+
+./components/contacts/contact-list.tsx:62:19
+Type error: Argument of type 'Contact' is not assignable to parameter of type 'import("/home/user/ext-marketing/lib/types/contact").Contact'.
+  Type 'Contact' is missing the following properties from type 'Contact': companyId, createdAt, updatedAt
+
+[0m [90m 60 |[39m   [36mconst[39m filteredContacts [33m=[39m contacts[33m.[39mfilter(contact [33m=>[39m {[0m
+[0m [90m 61 |[39m     [36mconst[39m matchesSearch [33m=[39m[0m
+[0m[31m[1m>[22m[39m[90m 62 |[39m       getFullName(contact)[33m.[39mtoLowerCase()[33m.[39mincludes(searchQuery[33m.[39mtoLowerCase()) [33m||[39m[0m
+[0m [90m    |[39m                   [31m[1m^[22m[39m[0m
+[0m [90m 63 |[39m       (contact[33m.[39memail[33m?[39m[33m.[39mtoLowerCase() [33m||[39m [32m''[39m)[33m.[39mincludes(searchQuery[33m.[39mtoLowerCase()) [33m||[39m[0m
+[0m [90m 64 |[39m       (contact[33m.[39mjobTitle[33m?[39m[33m.[39mtoLowerCase() [33m||[39m [32m''[39m)[33m.[39mincludes(searchQuery[33m.[39mtoLowerCase()) [33m||[39m[0m
+[0m [90m 65 |[39m       (contact[33m.[39mcompanyName[33m?[39m[33m.[39mtoLowerCase() [33m||[39m [32m''[39m)[33m.[39mincludes(searchQuery[33m.[39mtoLowerCase())[0m

@@ -48,7 +48,7 @@ export async function GET(
         'SELECT * FROM invoice_items WHERE invoiceId = ? ORDER BY "order"'
       ).all(params.id)
 
-      return NextResponse.json({ ...invoice, items })
+      return NextResponse.json({ ...(invoice as any), items })
     } finally {
       db.close()
     }
@@ -171,7 +171,7 @@ export async function PATCH(
         'SELECT * FROM invoice_items WHERE invoiceId = ? ORDER BY "order"'
       ).all(params.id)
 
-      return NextResponse.json({ ...updatedInvoice, items })
+      return NextResponse.json({ ...(updatedInvoice as any), items })
     } finally {
       db.close()
     }

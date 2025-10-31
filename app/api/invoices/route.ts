@@ -187,7 +187,7 @@ export async function POST(request: Request) {
         'SELECT * FROM invoice_items WHERE invoiceId = ? ORDER BY "order"'
       ).all(invoiceId)
 
-      return NextResponse.json({ ...invoice, items: invoiceItems }, { status: 201 })
+      return NextResponse.json({ ...(invoice as any), items: invoiceItems }, { status: 201 })
     } finally {
       db.close()
     }

@@ -91,7 +91,9 @@ export default function ContactDetailPage() {
               <div className="flex items-center gap-2">
                 <h1 className="text-3xl font-bold">{getFullName(contact)}</h1>
                 {contact.isPrimary && (
-                  <Star className="h-5 w-5 fill-yellow-400 text-yellow-400" title="Primary Contact" />
+                  <span title="Primary Contact">
+                    <Star className="h-5 w-5 fill-yellow-400 text-yellow-400" />
+                  </span>
                 )}
               </div>
               {contact.jobTitle && (

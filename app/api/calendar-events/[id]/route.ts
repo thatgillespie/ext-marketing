@@ -28,7 +28,7 @@ export async function GET(
     }
 
     return NextResponse.json({
-      ...event,
+      ...(event as any),
       allDay: Boolean((event as any).allDay)
     })
   } catch (error) {
@@ -127,7 +127,7 @@ export async function PATCH(
     `).get(params.id)
 
     return NextResponse.json({
-      ...event,
+      ...(event as any),
       allDay: Boolean((event as any).allDay)
     })
   } catch (error) {

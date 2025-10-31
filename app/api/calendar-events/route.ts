@@ -52,7 +52,7 @@ export async function GET(request: NextRequest) {
 
     // Convert SQLite boolean values (0/1) to actual booleans
     const formattedEvents = events.map((event: any) => ({
-      ...event,
+      ...(event as any),
       allDay: Boolean(event.allDay)
     }))
 
@@ -139,7 +139,7 @@ export async function POST(request: NextRequest) {
     `).get(id)
 
     return NextResponse.json({
-      ...event,
+      ...(event as any),
       allDay: Boolean((event as any).allDay)
     }, { status: 201 })
   } catch (error) {

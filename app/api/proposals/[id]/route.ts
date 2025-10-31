@@ -48,7 +48,7 @@ export async function GET(
         'SELECT * FROM proposal_items WHERE proposalId = ? ORDER BY "order"'
       ).all(params.id)
 
-      return NextResponse.json({ ...proposal, items })
+      return NextResponse.json({ ...(proposal as any), items })
     } finally {
       db.close()
     }
@@ -183,7 +183,7 @@ export async function PATCH(
         'SELECT * FROM proposal_items WHERE proposalId = ? ORDER BY "order"'
       ).all(params.id)
 
-      return NextResponse.json({ ...updatedProposal, items })
+      return NextResponse.json({ ...(updatedProposal as any), items })
     } finally {
       db.close()
     }

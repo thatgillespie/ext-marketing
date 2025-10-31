@@ -36,7 +36,7 @@ export async function GET(
     }
 
     return NextResponse.json({
-      ...user,
+      ...(user as any),
       active: Boolean((user as any).active)
     })
   } catch (error) {
@@ -167,7 +167,7 @@ export async function PATCH(
     `).get(params.id)
 
     return NextResponse.json({
-      ...user,
+      ...(user as any),
       active: Boolean((user as any).active)
     })
   } catch (error) {

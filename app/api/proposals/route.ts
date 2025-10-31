@@ -185,7 +185,7 @@ export async function POST(request: Request) {
         'SELECT * FROM proposal_items WHERE proposalId = ? ORDER BY "order"'
       ).all(proposalId)
 
-      return NextResponse.json({ ...proposal, items: proposalItems }, { status: 201 })
+      return NextResponse.json({ ...(proposal as any), items: proposalItems }, { status: 201 })
     } finally {
       db.close()
     }

@@ -5,23 +5,11 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { User, Edit, Trash2, Eye, Search, Mail, Phone, Star } from "lucide-react"
-import { getFullName, formatPhoneNumber, getInitials } from "@/lib/types/contact"
+import { Contact, getFullName, formatPhoneNumber, getInitials } from "@/lib/types/contact"
 import Link from "next/link"
 
-interface Contact {
-  id: string
-  firstName: string
-  lastName: string
-  email?: string | null
-  phone?: string | null
-  jobTitle?: string | null
-  isPrimary: boolean
-  companyName?: string
-  notes?: string | null
-}
-
 interface ContactListProps {
-  contacts: Contact[]
+  contacts: any[]
   onUpdate: () => void
 }
 
@@ -164,7 +152,7 @@ export function ContactList({ contacts, onUpdate }: ContactListProps) {
                               {getFullName(contact)}
                             </p>
                             {contact.isPrimary && (
-                              <Star className="h-3 w-3 fill-yellow-400 text-yellow-400" title="Primary Contact" />
+                              <span title="Primary Contact"><Star className="h-3 w-3 fill-yellow-400 text-yellow-400" /></span>
                             )}
                           </div>
                           {contact.jobTitle && (
